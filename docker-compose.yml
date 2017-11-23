@@ -1,0 +1,12 @@
+version: "3.3"
+
+services:
+  cadmus:
+    image: prologic/cadmus
+    command: -dbpath /data/cadmus.db irc.freenode.net:6667
+    ports:
+      "8000:8000/tcp"
+    deploy:
+      restart_policy:
+        condition: on-failure
+      replicas: 1
