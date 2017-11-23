@@ -159,6 +159,14 @@ func main() {
 		conn.Mode(channel.Name)
 	})
 
+	conn.AddCallback("PRIVMSG", func(e *irc.Event) {
+		if e.Arguments[0][0] != '#' {
+			return
+		}
+
+		log.Infof("[%s] <%s> %s", time.Now().Format("15:04:05"), e.User, e.Message())
+	})
+
 	err = conn.Connect(addr.String())
 	if err != nil {
 		fmt.Printf("Err %s", err)
