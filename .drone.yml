@@ -21,7 +21,7 @@ pipeline:
     from: drone@mills.io
     skip_verify: true 
     when:
-      status: [ changed, failure ]
+      status: [ success, changed, failure ]
 
 secrets:
   registry_username:
