@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/asdine/storm"
+	"github.com/robfig/cron"
 	"github.com/thoj/go-ircevent"
 )
 
@@ -23,27 +24,28 @@ type Config struct {
 
 type Bot struct {
 	config *Config
+	cron   *cron.Cron
 	conn   *irc.Connection
 
 	network string
-	loggers map[string]Logger
+	loggers *ChannelLoggerMap
 }
 
 func NewBot(config *Config) *Bot {
 	return &Bot{
 		config:  config,
-		loggers: make(map[string]Logger),
+		loggers: NewChannelLoggerMap(),
 	}
 }
 
 func (b *Bot) getLogger(channel string) (logger Logger, err error) {
-	logger = b.loggers[channel]
+	logger = b.loggers.Get(channel)
 	if logger == nil {
 		logger, err = NewFileLogger(b.config.logdir, b.network, channel)
 		if err != nil {
 			return nil, err
 		}
-		b.loggers[channel] = logger
+		b.loggers.Add(logger)
 	}
 	return
 }
@@ -111,6 +113,15 @@ func (b *Bot) onMessage(e *irc.Event) {
 }
 
 func (b *Bot) Run() error {
+	b.cron = cron.New()
+	b.cron.AddFunc("@daily", func() {
+		b.loggers.Range(func(channel string, logger Logger) bool {
+			logger.Rotate()
+			return true
+		})
+	})
+	b.cron.Start()
+
 	b.conn = irc.IRC(b.config.nick, b.config.user)
 	b.conn.RealName = b.config.name
 

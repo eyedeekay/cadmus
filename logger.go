@@ -16,6 +16,9 @@ type Logger interface {
 	Log(message string) error
 	Logf(format string, args ...interface{}) error
 
+	Channel() string
+	Network() string
+
 	LogMessage(user, message string) error
 }
 
@@ -52,6 +55,14 @@ func NewFileLogger(logdir, network, channel string) (*FileLogger, error) {
 		channel: channel,
 		f:       f,
 	}, nil
+}
+
+func (l *FileLogger) Channel() string {
+	return l.channel
+}
+
+func (l *FileLogger) Network() string {
+	return l.network
 }
 
 func (l *FileLogger) Rotate() error {
