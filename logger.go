@@ -34,7 +34,6 @@ type FileLogger struct {
 
 func NewFileLogger(logdir, network, channel string) (*FileLogger, error) {
 	pathname := path.Join(logdir, network, channel)
-	log.Infof("creating logdir: %s", pathname)
 	err := os.MkdirAll(pathname, 0755)
 	if err != nil {
 		return nil, err
@@ -48,6 +47,8 @@ func NewFileLogger(logdir, network, channel string) (*FileLogger, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	log.Infof("Logger created for %s on %s", channel, network)
 
 	return &FileLogger{
 		logdir:  logdir,
@@ -71,12 +72,12 @@ func (l *FileLogger) Rotate() error {
 
 	l.f.Close()
 
-	logfile := path.Join(
-		l.logdir,
+	filename := path.Join(
+		l.logdir, l.network, l.channel,
 		fmt.Sprintf("%s.log", time.Now().Format("2006-01-02")),
 	)
 
-	f, err := os.OpenFile(logfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}

@@ -117,6 +117,10 @@ func (b *Bot) Run() error {
 	b.cron.AddFunc("@daily", func() {
 		b.loggers.Range(func(channel string, logger Logger) bool {
 			logger.Rotate()
+			log.Infof(
+				"Logger rotated for %s on %s",
+				logger.Channel(), logger.Network(),
+			)
 			return true
 		})
 	})
