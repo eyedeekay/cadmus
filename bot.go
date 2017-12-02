@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"fmt"
 	"regexp"
 	"time"
 
@@ -27,14 +26,26 @@ type Bot struct {
 	conn   *irc.Connection
 
 	network string
-	loggers map[string]map[string]Logger
+	loggers map[string]Logger
 }
 
 func NewBot(config *Config) *Bot {
 	return &Bot{
 		config:  config,
-		loggers: make(map[string]map[string]Logger),
+		loggers: make(map[string]Logger),
 	}
+}
+
+func (b *Bot) getLogger(channel string) (logger Logger, err error) {
+	logger = b.loggers[channel]
+	if logger == nil {
+		logger, err = NewFileLogger(b.config.logdir, b.network, channel)
+		if err != nil {
+			return nil, err
+		}
+		b.loggers[channel] = logger
+	}
+	return
 }
 
 func (b *Bot) onInvite(e *irc.Event) {
@@ -65,6 +76,7 @@ func (b *Bot) onConnected(e *irc.Event) {
 	matches := p.FindStringSubmatch(e.Message())
 	if len(matches) == 2 {
 		b.network = matches[1]
+		log.Infof("Network is %s", b.network)
 	}
 
 	err := db.All(&channels)
@@ -84,39 +96,18 @@ func (b *Bot) onMessage(e *irc.Event) {
 		return
 	}
 
-	ts := time.Now().Format("15:04:05")
 	channel := e.Arguments[0]
-	logger, ok := b.loggers[b.network][channel]
-	if !ok {
-		logger, err := NewFileLogger(b.config.logdir, b.network, channel)
-		if err != nil {
-			log.Errorf(
-				"failed to create logger for %s %s: %s",
-				b.network, channel, err,
-			)
-			return
-		}
-		network := b.loggers[b.network]
-		if network == nil {
-			b.loggers[b.network] = make(map[string]Logger)
-		}
-		b.loggers[b.network][channel] = logger
-		logger.Log(fmt.Sprintf("[%s] <%s> %s\n", ts, e.User, e.Message()))
-	} else {
-		logger.Log(fmt.Sprintf("[%s] <%s> %s\n", ts, e.User, e.Message()))
+
+	logger, err := b.getLogger(channel)
+	if err != nil {
+		log.Errorf(
+			"error getting logger for %s on %s: %s",
+			channel, b.network, err,
+		)
+		return
 	}
-}
 
-func (b *Bot) onJoin(e *irc.Event) {
-	log.Debugf("onJoin: %v", e)
-}
-
-func (b *Bot) onPart(e *irc.Event) {
-	log.Debugf("onPart: %v", e)
-}
-
-func (b *Bot) onQuit(e *irc.Event) {
-	log.Debugf("onQuit: %v", e)
+	logger.LogMessage(e.User, e.Message())
 }
 
 func (b *Bot) Run() error {
@@ -144,8 +135,5 @@ func (b *Bot) Run() error {
 func (b *Bot) setupCallbacks() {
 	b.conn.AddCallback("001", b.onConnected)
 	b.conn.AddCallback("INVITE", b.onInvite)
-	b.conn.AddCallback("JOIN", b.onJoin)
-	b.conn.AddCallback("PART", b.onPart)
-	b.conn.AddCallback("QUIT", b.onQuit)
 	b.conn.AddCallback("PRIVMSG", b.onMessage)
 }

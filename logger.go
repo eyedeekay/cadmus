@@ -14,6 +14,9 @@ import (
 type Logger interface {
 	Rotate() error
 	Log(message string) error
+	Logf(format string, args ...interface{}) error
+
+	LogMessage(user, message string) error
 }
 
 type FileLogger struct {
@@ -81,4 +84,13 @@ func (l *FileLogger) Log(message string) error {
 	}
 	_, err := l.f.WriteString(message)
 	return err
+}
+
+func (l *FileLogger) Logf(format string, args ...interface{}) error {
+	return l.Log(fmt.Sprintf(format, args...))
+}
+
+func (l *FileLogger) LogMessage(user, message string) error {
+	ts := time.Now().Format("15:04:05")
+	return l.Logf("[%s] <%s> %s", ts, user, message)
 }
