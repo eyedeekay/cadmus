@@ -2,3 +2,5 @@
 *.db
 *.bak
 cadmus
+
+logs

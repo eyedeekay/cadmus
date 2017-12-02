@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"regexp"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -26,11 +27,14 @@ type Bot struct {
 	conn   *irc.Connection
 
 	network string
-	loggers map[string]Logger
+	loggers map[string]map[string]Logger
 }
 
 func NewBot(config *Config) *Bot {
-	return &Bot{config: config}
+	return &Bot{
+		config:  config,
+		loggers: make(map[string]map[string]Logger),
+	}
 }
 
 func (b *Bot) onInvite(e *irc.Event) {
@@ -53,10 +57,15 @@ func (b *Bot) onInvite(e *irc.Event) {
 }
 
 func (b *Bot) onConnected(e *irc.Event) {
-	log.Info("Connected!")
-	log.Debugf("onConnected: %v", e)
-
 	var channels []Channel
+
+	log.Info("Connected!")
+
+	p := regexp.MustCompile("^[Ww]elcome to the (.*) Internet Relay Network")
+	matches := p.FindStringSubmatch(e.Message())
+	if len(matches) == 2 {
+		b.network = matches[1]
+	}
 
 	err := db.All(&channels)
 	if err != nil {
@@ -74,13 +83,28 @@ func (b *Bot) onMessage(e *irc.Event) {
 	if e.Arguments[0][0] != '#' {
 		return
 	}
+
+	ts := time.Now().Format("15:04:05")
 	channel := e.Arguments[0]
-	logger, ok := b.loggers[channel]
+	logger, ok := b.loggers[b.network][channel]
 	if !ok {
-		log.Warnf("missing logger for %s", channel)
-		return
+		logger, err := NewFileLogger(b.config.logdir, b.network, channel)
+		if err != nil {
+			log.Errorf(
+				"failed to create logger for %s %s: %s",
+				b.network, channel, err,
+			)
+			return
+		}
+		network := b.loggers[b.network]
+		if network == nil {
+			b.loggers[b.network] = make(map[string]Logger)
+		}
+		b.loggers[b.network][channel] = logger
+		logger.Log(fmt.Sprintf("[%s] <%s> %s\n", ts, e.User, e.Message()))
+	} else {
+		logger.Log(fmt.Sprintf("[%s] <%s> %s\n", ts, e.User, e.Message()))
 	}
-	logger.Log(fmt.Sprintf("<%s> %s", e.User, e.Message()))
 }
 
 func (b *Bot) onJoin(e *irc.Event) {

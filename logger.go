@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Logger interface {
@@ -25,7 +28,8 @@ type FileLogger struct {
 
 func NewFileLogger(logdir, network, channel string) (*FileLogger, error) {
 	pathname := path.Join(logdir, network, channel)
-	err := os.MkdirAll(pathname, 0x755)
+	log.Infof("creating logdir: %s", pathname)
+	err := os.MkdirAll(pathname, 0755)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +51,7 @@ func NewFileLogger(logdir, network, channel string) (*FileLogger, error) {
 	}, nil
 }
 
-func (l *FileLogger) Rorate() error {
+func (l *FileLogger) Rotate() error {
 	l.Lock()
 	defer l.Unlock()
 
@@ -72,6 +76,9 @@ func (l *FileLogger) Log(message string) error {
 	l.Lock()
 	defer l.Unlock()
 
+	if !strings.HasSuffix(message, "\n") {
+		message += "\n"
+	}
 	_, err := l.f.WriteString(message)
 	return err
 }
