@@ -1,6 +1,6 @@
 *~*
 *.db
 *.bak
-cadmus
+cmd/cadmus/cadmus
 
 logs
