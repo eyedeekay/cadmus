@@ -6,7 +6,14 @@ pipeline:
   build:
     image: golang
     commands:
-      - make
+      - go get -d ./...
+      - go build -o cadmus ./cmd/cadmus/main.go
+
+  test:
+    image: golang
+    commands:
+      - go get -d ./...
+      - go test ./...
 
   docker:
     image: plugins/docker
