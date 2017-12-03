@@ -22,7 +22,7 @@ ENV REPO prologic/$APP
 
 LABEL cadmus.app main
 
-COPY --from=build /go/src/github.com/${REPO}/${APP} /${APP}
+COPY --from=build /go/src/github.com/${REPO}/cmd/${APP}/${APP} /${APP}
 
 EXPOSE 8000/tcp
 
