@@ -1,4 +1,4 @@
-package main
+package cadmus
 
 import (
 	"crypto/tls"
@@ -13,26 +13,35 @@ import (
 )
 
 type Config struct {
-	nick string
-	user string
-	name string
+	Nick string
+	User string
+	Name string
 
-	addr   *Addr
-	debug  bool
-	logdir string
+	Debug   bool
+	DBPath  string
+	LogPath string
 }
 
 type Bot struct {
+	addr   *Addr
 	config *Config
-	cron   *cron.Cron
-	conn   *irc.Connection
+
+	db   *storm.DB
+	cron *cron.Cron
+	conn *irc.Connection
 
 	network string
 	loggers *ChannelLoggerMap
 }
 
-func NewBot(config *Config) *Bot {
+func NewBot(addr string, config *Config) *Bot {
+	parsedAddr, err := ParseAddr(addr)
+	if err != nil {
+		log.Fatalf("error parsing addr %s: %s", addr, err)
+	}
+
 	return &Bot{
+		addr:    parsedAddr,
 		config:  config,
 		loggers: NewChannelLoggerMap(),
 	}
@@ -41,7 +50,7 @@ func NewBot(config *Config) *Bot {
 func (b *Bot) getLogger(channel string) (logger Logger, err error) {
 	logger = b.loggers.Get(channel)
 	if logger == nil {
-		logger, err = NewFileLogger(b.config.logdir, b.network, channel)
+		logger, err = NewFileLogger(b.config.LogPath, b.network, channel)
 		if err != nil {
 			return nil, err
 		}
@@ -52,10 +61,10 @@ func (b *Bot) getLogger(channel string) (logger Logger, err error) {
 
 func (b *Bot) onInvite(e *irc.Event) {
 	var channel Channel
-	err := db.One("Name", e.Arguments[0], &channel)
+	err := b.db.One("Name", e.Arguments[0], &channel)
 	if err != nil && err == storm.ErrNotFound {
 		channel = NewChannel(e.Arguments[1])
-		err := db.Save(&channel)
+		err := b.db.Save(&channel)
 		if err != nil {
 			log.Fatalf("error saving channel to db: %s", err)
 		}
@@ -81,7 +90,7 @@ func (b *Bot) onConnected(e *irc.Event) {
 		log.Infof("Network is %s", b.network)
 	}
 
-	err := db.All(&channels)
+	err := b.db.All(&channels)
 	if err != nil {
 		log.Fatalf("error loading channels from db: %s", err)
 	}
@@ -113,6 +122,14 @@ func (b *Bot) onMessage(e *irc.Event) {
 }
 
 func (b *Bot) Run() error {
+	db, err := storm.Open(b.config.DBPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	b.db = db
+
 	b.cron = cron.New()
 	b.cron.AddFunc("@daily", func() {
 		b.loggers.Range(func(channel string, logger Logger) bool {
@@ -126,19 +143,19 @@ func (b *Bot) Run() error {
 	})
 	b.cron.Start()
 
-	b.conn = irc.IRC(b.config.nick, b.config.user)
-	b.conn.RealName = b.config.name
+	b.conn = irc.IRC(b.config.Nick, b.config.User)
+	b.conn.RealName = b.config.Name
 
-	b.conn.VerboseCallbackHandler = b.config.debug
-	b.conn.Debug = b.config.debug
+	b.conn.VerboseCallbackHandler = b.config.Debug
+	b.conn.Debug = b.config.Debug
 
 	b.setupCallbacks()
 
-	b.conn.UseTLS = b.config.addr.UseTLS
+	b.conn.UseTLS = b.addr.UseTLS
 	b.conn.KeepAlive = 30 * time.Second
 	b.conn.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 
-	err := b.conn.Connect(b.config.addr.String())
+	err = b.conn.Connect(b.addr.String())
 	if err != nil {
 		return err
 	}
