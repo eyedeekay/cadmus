@@ -36,6 +36,11 @@ $ ./cadmus
 - When Cadmus is invited to a channel; it will immediately join.
 - Cadmus will then log all activity on the channel.
 
+## Related Projects
+
+* [eris](https://github.com/prologic/eris) -- a modern IRC Server / Daemon written in Go that has a heavy focus on security and privacy
+* [soter](https://github.com/prologic/soter) -- an IRC Bot written in Go that protects IRC Channels by persisting channel modes and topics
+
 ## License
 
 Cadmus is licensed under the MIT License.
